@@ -4,6 +4,13 @@ from dash import dcc, html, Dash
 from dash.dependencies import Input, Output, State
 import pandas as pd
 import dash  # Import dash here
+from flask import Flask
+
+
+# Flask 서버 객체 생성
+server = Flask(__name__)
+
+
 
 
 # 자산 설명
@@ -24,22 +31,32 @@ assets = {
 # 1년치 데이터 다운로드
 data = yf.download(list(assets.keys()), period='1y')
 
+# 6개월치 데이터 다운로드
+data_6m = yf.download(list(assets.keys()), period='6mo')
+
 # 종가(Close) 데이터 추출
 close_data = data['Adj Close']
+close_data_6m = data_6m['Adj Close']
+# close_data = data['Close']  # 'Adj Close' 대신 'Close'를 사용
+
 
 # 수익률 계산 (수익률 = (현재 가격 / 시작 가격) - 1)
 returns_1y = close_data / close_data.iloc[0] - 1
 
 # 최근 6개월 데이터 추출
-returns_6m = close_data[-126:] / close_data[-126:].iloc[0] - 1  # 6개월 동안의 수익률
+returns_6m = close_data_6m / close_data_6m.iloc[0] - 1  # 6개월 동안의 수익률
 
 # 일봉, 주봉, 월봉 데이터 생성
 daily_returns = close_data / close_data.iloc[0] - 1
 weekly_returns = close_data.resample('W').last() / close_data.resample('W').last().iloc[0] - 1
 monthly_returns = close_data.resample('ME').last() / close_data.resample('ME').last().iloc[0] - 1  # Changed 'M' to 'ME'
 
+daily_returns_6m = close_data_6m / close_data_6m.iloc[0] - 1
+weekly_returns_6m = close_data_6m.resample('W').last() / close_data_6m.resample('W').last().iloc[0] - 1
+monthly_returns_6m = close_data_6m.resample('ME').last() / close_data_6m.resample('ME').last().iloc[0] - 1  # Changed 'M' to 'ME'
+
 # 그래프 생성 함수
-def create_return_plot(returns):
+def create_return_plot(returns, year6month):
     fig = go.Figure()
 
     # 자산을 원하는 순서로 추가 (SPLG, QQQM, EFA) - 범례 순서 설정
@@ -58,10 +75,26 @@ def create_return_plot(returns):
             mode='lines',
             name=asset,
         ))
+        
+         # year6month에 따른 데이터 선택 함수
+    def get_data_by_period(period, data_type):
+        if period == 'year':
+            if data_type == 'daily':
+                return daily_returns
+            elif data_type == 'weekly':
+                return weekly_returns
+            elif data_type == 'monthly':
+                return monthly_returns
+        elif period == '6month':
+            if data_type == 'daily':
+                return daily_returns_6m
+            elif data_type == 'weekly':
+                return weekly_returns_6m
+            elif data_type == 'monthly':
+                return monthly_returns_6m
 
     # 레이아웃 설정
     fig.update_layout(
-        
         xaxis_title='Date',
         yaxis_title='Cumulative Return (%)',
         yaxis_tickformat='.2%',
@@ -73,29 +106,23 @@ def create_return_plot(returns):
                 showactive=True,
                 buttons=[
                     dict(
-                        args=[
-                            {"x": [daily_returns.index] * len(ordered_assets),
-                             "y": [daily_returns[asset] for asset in ordered_assets],
-                             "visible": [True] * len(ordered_assets)},  # 자산 순서 유지
-                        ],
+                        args=[{"x": [get_data_by_period(year6month, 'daily').index] * len(ordered_assets),
+                               "y": [get_data_by_period(year6month, 'daily')[asset] for asset in ordered_assets],
+                               "visible": [True] * len(ordered_assets)}],
                         label="일봉",
                         method="update"
                     ),
                     dict(
-                        args=[
-                            {"x": [weekly_returns.index] * len(ordered_assets),
-                             "y": [weekly_returns[asset] for asset in ordered_assets],
-                             "visible": [True] * len(ordered_assets)},  # 자산 순서 유지
-                        ],
+                        args=[{"x": [get_data_by_period(year6month, 'weekly').index] * len(ordered_assets),
+                               "y": [get_data_by_period(year6month, 'weekly')[asset] for asset in ordered_assets],
+                               "visible": [True] * len(ordered_assets)}],
                         label="주봉",
                         method="update"
                     ),
                     dict(
-                        args=[
-                            {"x": [monthly_returns.index] * len(ordered_assets),
-                             "y": [monthly_returns[asset] for asset in ordered_assets],
-                             "visible": [True] * len(ordered_assets)},  # 자산 순서 유지
-                        ],
+                        args=[{"x": [get_data_by_period(year6month, 'monthly').index] * len(ordered_assets),
+                               "y": [get_data_by_period(year6month, 'monthly')[asset] for asset in ordered_assets],
+                               "visible": [True] * len(ordered_assets)}],
                         label="월봉",
                         method="update"
                     )
@@ -297,7 +324,8 @@ def investment_decision(investment_amount=None):
 
 
 # Dash 애플리케이션 생성
-app = Dash(__name__)
+app = Dash(__name__, server=server, url_base_pathname='/')
+
 
 app.layout = html.Div([
     html.H1('변형듀얼모멘텀 투자',id='title', style={'margin': '30px', 'textAlign': 'center'}),
@@ -431,7 +459,7 @@ def update_investment_decision(calculate_clicks, reset_clicks, investment_amount
     Input('return-plot-1y', 'id')  # Dummy input to trigger callback
 )
 def update_graph_1y(id_value):
-    return create_return_plot(returns_1y)
+    return create_return_plot(returns_1y, "year")
 
 # 콜백: 6개월 수익률 그래프 업데이트
 @app.callback(
@@ -439,7 +467,7 @@ def update_graph_1y(id_value):
     Input('return-plot-6m', 'id')  # Dummy input to trigger callback
 )
 def update_graph_6m(id_value):
-    return create_return_plot(returns_6m)
+    return create_return_plot(returns_6m, "6month")
 
 # 서버 실행
 if __name__ == '__main__':
