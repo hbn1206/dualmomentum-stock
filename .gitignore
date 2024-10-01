@@ -1,0 +1,14 @@
+# Python 환경
+myenv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 패키지 관리
+*.egg-info/
+dist/
+build/
+
+# IDE 관련 파일
+.vscode/
+.idea/

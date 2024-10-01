@@ -7,11 +7,13 @@ import dash  # Import dash here
 from flask import Flask
 
 
+
 # Flask 서버 객체 생성
 server = Flask(__name__)
 
-
-
+# Dash 애플리케이션 초기화
+app = Dash(__name__, server=server)
+print(type(app))  # 이 부분을 추가하여 확인
 
 # 자산 설명
 assets = {
@@ -322,11 +324,6 @@ def investment_decision(investment_amount=None):
         
         return investment_message + allocation_message
 
-
-# Dash 애플리케이션 생성
-app = Dash(__name__, server=server, url_base_pathname='/')
-
-
 app.layout = html.Div([
     html.H1('변형듀얼모멘텀 투자',id='title', style={'margin': '30px', 'textAlign': 'center'}),
     html.H2(id='investment-decision', style={'margin': '30px', 'textAlign': 'center'}),
@@ -471,4 +468,5 @@ def update_graph_6m(id_value):
 
 # 서버 실행
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    from waitress import serve
+    serve(app.server, host='0.0.0.0', port=8000)
