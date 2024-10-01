@@ -13,7 +13,7 @@ server = Flask(__name__)
 
 # Dash 애플리케이션 초기화
 app = Dash(__name__, server=server)
-print(type(app))  # 이 부분을 추가하여 확인
+
 
 # 자산 설명
 assets = {
