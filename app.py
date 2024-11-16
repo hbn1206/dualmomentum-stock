@@ -12,7 +12,7 @@ from flask import Flask
 server = Flask(__name__)
 
 # Dash 애플리케이션 초기화
-app = Dash(__name__, server=server)
+app = Dash(__name__, server=server, assets_folder="assets")
 
 
 # 자산 설명
@@ -385,7 +385,7 @@ app.layout = html.Div([
             )
         ]
    ),    html.Div(
-        id='asset-description',
+        id='asset-description2',
         style={
             'marginTop': '20px',
             'display': 'flex',
